@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>School Status App</title>
+
+  <style>
+    *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+      font-family:Arial, sans-serif;
+    }
+
+    body{
+      background:#0f172a;
+      color:white;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      min-height:100vh;
+      padding:20px;
+    }
+
+    .container{
+      width:100%;
+      max-width:400px;
+      background:#1e293b;
+      padding:25px;
+      border-radius:18px;
+      box-shadow:0 0 20px rgba(0,0,0,0.4);
+    }
+
+    h1{
+      text-align:center;
+      margin-bottom:20px;
+    }
+
+    input{
+      width:100%;
+      padding:12px;
+      margin:10px 0;
+      border:none;
+      border-radius:10px;
+      outline:none;
+      font-size:16px;
+    }
+
+    button{
+      width:100%;
+      padding:12px;
+      border:none;
+      border-radius:10px;
+      margin-top:10px;
+      font-size:16px;
+      cursor:pointer;
+      transition:0.2s;
+    }
+
+    button:hover{
+      opacity:0.9;
+    }
+
+    .register-btn{
+      background:#3b82f6;
+      color:white;
+    }
+
+    .login-btn{
+      background:#10b981;
+      color:white;
+    }
+
+    .going-btn{
+      background:#22c55e;
+      color:white;
+    }
+
+    .notgoing-btn{
+      background:#ef4444;
+      color:white;
+    }
+
+    .logout-btn{
+      background:#f59e0b;
+      color:white;
+    }
+
+    .status-list{
+      margin-top:20px;
+      background:#334155;
+      border-radius:10px;
+      padding:10px;
+      max-height:250px;
+      overflow-y:auto;
+    }
+
+    .user{
+      padding:10px;
+      margin:5px 0;
+      background:#475569;
+      border-radius:8px;
+    }
+
+    .hidden{
+      display:none;
+    }
+
+    .welcome{
+      text-align:center;
+      margin-bottom:15px;
+      font-size:18px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <div id="authSection">
+    <h1>School Status</h1>
+
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+
+    <button class="register-btn" onclick="register()">Register</button>
+    <button class="login-btn" onclick="login()">Login</button>
+  </div>
+
+  <div id="appSection" class="hidden">
+
+    <div class="welcome">
+      Welcome, <span id="currentUser"></span>
+    </div>
+
+    <button class="going-btn" onclick="updateStatus('Going')">
+      Going To School
+    </button>
+
+    <button class="notgoing-btn" onclick="updateStatus('Not Going')">
+      Not Going
+    </button>
+
+    <button class="logout-btn" onclick="logout()">
+      Logout
+    </button>
+
+    <div class="status-list" id="statusList"></div>
+
+  </div>
+
+</div>
+
+<!-- Firebase -->
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  collection,
+  onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+
+  apiKey: "YOUR_API_KEY",
+
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+
+  projectId: "YOUR_PROJECT_ID",
+
+  storageBucket: "YOUR_PROJECT.appspot.com",
+
+  messagingSenderId: "XXXXXXXX",
+
+  appId: "YOUR_APP_ID"
+
+};
+
+const app = initializeApp(firebaseConfig);
+
+const db = getFirestore(app);
+
+let loggedInUser = "";
+
+window.register = async function(){
+
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  if(username === "" || password === ""){
+    alert("Enter username and password");
+    return;
+  }
+
+  const userRef = doc(db, "users", username);
+  const userSnap = await getDoc(userRef);
+
+  if(userSnap.exists()){
+    alert("Username already exists");
+    return;
+  }
+
+  await setDoc(userRef, {
+    password: password,
+    status: "Unknown"
+  });
+
+  alert("Account Created!");
+
+}
+
+window.login = async function(){
+
+  const username = document.getElementById("username").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  const userRef = doc(db, "users", username);
+
+  const userSnap = await getDoc(userRef);
+
+  if(!userSnap.exists()){
+    alert("User not found");
+    return;
+  }
+
+  if(userSnap.data().password !== password){
+    alert("Wrong password");
+    return;
+  }
+
+  loggedInUser = username;
+
+  localStorage.setItem("schoolUser", username);
+
+  document.getElementById("authSection").classList.add("hidden");
+  document.getElementById("appSection").classList.remove("hidden");
+
+  document.getElementById("currentUser").innerText = username;
+
+}
+
+window.updateStatus = async function(status){
+
+  await updateDoc(doc(db, "users", loggedInUser), {
+    status: status
+  });
+
+}
+
+window.logout = function(){
+
+  localStorage.removeItem("schoolUser");
+
+  location.reload();
+
+}
+
+onSnapshot(collection(db, "users"), (snapshot)=>{
+
+  const statusList = document.getElementById("statusList");
+
+  statusList.innerHTML = "";
+
+  snapshot.forEach((docu)=>{
+
+    const data = docu.data();
+
+    statusList.innerHTML += `
+      <div class="user">
+        <b>${docu.id}</b> → ${data.status}
+      </div>
+    `;
+
+  });
+
+});
+
+</script>
+
+</body>
+</html>
